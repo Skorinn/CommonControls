@@ -8,15 +8,10 @@
 // Revision History: 
 //====================================================================================================================
 // 2023/12/02 - Mike Pullen - Original implementation.
-//*********************************************************************************************************************using System;
-using System.Collections.Generic;
+//*********************************************************************************************************************
 using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Drawing2D;
-using System.Data;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace CommonControls
@@ -38,10 +33,11 @@ namespace CommonControls
         #endregion
         #region Contructors and Destructor
 
+        /// <summary>
+        /// Default constructor
+        /// </summary>
         public ToggleButton()
         {
-            InitializeComponent();
-
             // Minimum size required to ensure it is drawn correctly
             this.MinimumSize = new Size(50, 25);
         }
@@ -141,6 +137,10 @@ namespace CommonControls
             return TogglePath;
         }
 
+        /// <summary>
+        /// Gets the rectangle for the toggle
+        /// </summary>
+        /// <returns></returns>
         private Rectangle GetToggleRectangle()
         {
             // Set the position based on the toggle state

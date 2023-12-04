@@ -1,5 +1,16 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿//*********************************************************************************************************************
+// File Name:      AssemblyInfo.cs
+// Description:    Assembly information for the Common Controls library
+//
+// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
+// Confidential and Proprietary
+//
+// Revision History: 
+//====================================================================================================================
+// 2023/12/02 - Mike Pullen - Original implementation.
+//*********************************************************************************************************************
+using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following
