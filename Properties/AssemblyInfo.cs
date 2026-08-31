@@ -2,12 +2,13 @@
 // File Name:      AssemblyInfo.cs
 // Description:    Assembly information for the Common Controls library
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (C) 2023 Mike Pullen.
+// Licensed under the MIT License. See the LICENSE file in the repository root.
 //
 // Revision History: 
 //====================================================================================================================
 // 2023/12/02 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Released under the MIT License.
 //*********************************************************************************************************************
 using System;
 using System.Reflection;
@@ -21,7 +22,7 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyConfiguration("Any CPU")]
 [assembly: AssemblyCompany("Mike Pullen")]
 [assembly: AssemblyProduct("CommonControls")]
-[assembly: AssemblyCopyright("Copyright ©  2023")]
+[assembly: AssemblyCopyright("Copyright © 2023 Mike Pullen")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

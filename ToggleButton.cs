@@ -2,12 +2,14 @@
 // File Name:      ToggleButton.cs
 // Description:    Implementation of the Toggle Button control
 //
-// Copyright (C) 2023 Mike Pullen. All Rights Reserved.
-// Confidential and Proprietary
+// Copyright (C) 2023 Mike Pullen.
+// Licensed under the MIT License. See the LICENSE file in the repository root.
 //
 // Revision History: 
 //====================================================================================================================
 // 2023/12/02 - Mike Pullen - Original implementation.
+// 2026/08/31 - Mike Pullen - Corrected spelling of the DrawingStyles.Hollow enumerator.
+// 2026/08/31 - Mike Pullen - Released under the MIT License.
 //*********************************************************************************************************************
 using System.ComponentModel;
 using System.Drawing;
@@ -27,7 +29,7 @@ namespace CommonControls
         public enum DrawingStyles
         {
             Solid,
-            Hallow,
+            Hollow,
         }
 
         #endregion
