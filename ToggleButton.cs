@@ -10,6 +10,8 @@
 // 2023/12/02 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Corrected spelling of the DrawingStyles.Hollow enumerator.
 // 2026/08/31 - Mike Pullen - Released under the MIT License.
+// 2026/08/31 - Mike Pullen - Disposed of the GDI+ drawing resources, opted in to resize repainting and
+//                            double buffering, and added designer metadata to the properties.
 //*********************************************************************************************************************
 using System.ComponentModel;
 using System.Drawing;
@@ -21,14 +23,23 @@ namespace CommonControls
     /// <summary>
     /// Toggle Button control
     /// </summary>
-    public partial class ToggleButton: CheckBox
+    public class ToggleButton: CheckBox
     {
         #region Type Definitions
 
-        // Drawing styles for the control
+        /// <summary>
+        /// Drawing styles for the control
+        /// </summary>
         public enum DrawingStyles
         {
+            /// <summary>
+            /// The background of the control is filled
+            /// </summary>
             Solid,
+
+            /// <summary>
+            /// Only the outline of the background is drawn
+            /// </summary>
             Hollow,
         }
 
@@ -40,6 +51,9 @@ namespace CommonControls
         /// </summary>
         public ToggleButton()
         {
+            // Repaint the whole surface on resize, and draw off screen, so resizing leaves no artifacts and does not flicker
+            this.SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+
             // Minimum size required to ensure it is drawn correctly
             this.MinimumSize = new Size(50, 25);
         }
@@ -50,61 +64,65 @@ namespace CommonControls
         /// <summary>
         /// Override for the paint event
         /// </summary>
-        /// <param name="pevent">IN - The paint event arguments</param>
+        /// <param name="paintEvent">IN - The paint event arguments</param>
         protected override void OnPaint(PaintEventArgs paintEvent)
         {
-            // Determine the height of the control
-            int iHeight = this.Height - 5;
-
             // Set the smoothing mode and clear the control area
             paintEvent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             paintEvent.Graphics.Clear(this.Parent.BackColor);
 
             // Set the colors based on the state of the toggle
-            SolidBrush backgroundBrush = null;
-            SolidBrush toggleBrush = null;
+            Color backgroundColor;
+            Color toggleColor;
 
             // If the control is disabled
             if (false == this.Enabled)
             {
-                backgroundBrush = new SolidBrush(m_DisabledBackground);
-                toggleBrush = new SolidBrush(m_DisabledToggle);
+                // Use the disabled colors
+                backgroundColor = m_DisabledBackground;
+                toggleColor = m_DisabledToggle;
             }
             // Otherwise, if the toggle is ON
             else if (this.Checked)
             {
                 // Use the ON colors
-                backgroundBrush = new SolidBrush(m_OnBackground);
-                toggleBrush = new SolidBrush(m_OnToggle);
-
+                backgroundColor = m_OnBackground;
+                toggleColor = m_OnToggle;
             }
             // Otherwise, the toggle is OFF
             else
             {
-                // Use the OFF colora
-                backgroundBrush = new SolidBrush(m_OffBackground);
-                toggleBrush = new SolidBrush(m_OffToggle);
+                // Use the OFF colors
+                backgroundColor = m_OffBackground;
+                toggleColor = m_OffToggle;
             }
 
-            // Get the paths for the background and toggle
-            GraphicsPath backgroundPath = GetBackgroundPath();
+            // Get the rectangle for the toggle
             Rectangle toggleRectangle = GetToggleRectangle();
 
-            // Draw the background based on the selected style
-            if (DrawingStyles.Solid == m_Style)
+            // Create the drawing resources, disposing of them once the control has been drawn
+            using (GraphicsPath backgroundPath = GetBackgroundPath())
+            using (SolidBrush backgroundBrush = new SolidBrush(backgroundColor))
+            using (SolidBrush toggleBrush = new SolidBrush(toggleColor))
             {
-                // Fill the background
-                paintEvent.Graphics.FillPath(backgroundBrush, backgroundPath);
+                // Draw the background based on the selected style
+                if (DrawingStyles.Solid == m_Style)
+                {
+                    // Fill the background
+                    paintEvent.Graphics.FillPath(backgroundBrush, backgroundPath);
+                }
+                else
+                {
+                    // Only draw the outline for the background
+                    using (Pen backgroundPen = new Pen(backgroundBrush, 1))
+                    {
+                        paintEvent.Graphics.DrawPath(backgroundPen, backgroundPath);
+                    }
+                }
+
+                // Draw the toggle
+                paintEvent.Graphics.FillEllipse(toggleBrush, toggleRectangle);
             }
-            else
-            {
-                // Only draw the outline for the background
-                Pen backgroundPen = new Pen(backgroundBrush, 1);
-                paintEvent.Graphics.DrawPath(backgroundPen, backgroundPath);
-            }
-            
-            // Draw the toggle
-            paintEvent.Graphics.FillEllipse(toggleBrush, toggleRectangle);
         }
 
         #endregion
@@ -113,7 +131,7 @@ namespace CommonControls
         /// <summary>
         /// Creates the path for the control
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The rounded path used to draw the background</returns>
         private GraphicsPath GetBackgroundPath()
         {
             // Determine what will be the radius of the toggle
@@ -142,7 +160,7 @@ namespace CommonControls
         /// <summary>
         /// Gets the rectangle for the toggle
         /// </summary>
-        /// <returns></returns>
+        /// <returns>The bounding rectangle of the toggle for the current state</returns>
         private Rectangle GetToggleRectangle()
         {
             // Set the position based on the toggle state
@@ -177,6 +195,9 @@ namespace CommonControls
         /// <summary>
         /// Background color when the toggle is in the OFF state
         /// </summary>
+        [Category("Appearance")]
+        [Description("Background color when the toggle is in the OFF state")]
+        [DefaultValue(typeof(Color), "Black")]
         public Color OffBackground
         {
             get => m_OffBackground;
@@ -190,6 +211,9 @@ namespace CommonControls
         /// <summary>
         /// Toggle color when the toggle is in the OFF state
         /// </summary>
+        [Category("Appearance")]
+        [Description("Toggle color when the toggle is in the OFF state")]
+        [DefaultValue(typeof(Color), "White")]
         public Color OffToggle
         {
             get => m_OffToggle;
@@ -203,6 +227,9 @@ namespace CommonControls
         /// <summary>
         /// Background color when the toggle is in the ON state
         /// </summary>
+        [Category("Appearance")]
+        [Description("Background color when the toggle is in the ON state")]
+        [DefaultValue(typeof(Color), "Black")]
         public Color OnBackground
         {
             get => m_OnBackground;
@@ -216,6 +243,9 @@ namespace CommonControls
         /// <summary>
         /// Toggle color when the toggle is in the ON state
         /// </summary>
+        [Category("Appearance")]
+        [Description("Toggle color when the toggle is in the ON state")]
+        [DefaultValue(typeof(Color), "White")]
         public Color OnToggle
         {
             get => m_OnToggle;
@@ -227,8 +257,11 @@ namespace CommonControls
         }
 
         /// <summary>
-        /// Background color when the toggle is in the ON state
+        /// Background color when the control is disabled
         /// </summary>
+        [Category("Appearance")]
+        [Description("Background color when the control is disabled")]
+        [DefaultValue(typeof(Color), "Gray")]
         public Color DisabledBackground
         {
             get => m_DisabledBackground;
@@ -240,8 +273,11 @@ namespace CommonControls
         }
 
         /// <summary>
-        /// Toggle color when the toggle is in the ON state
+        /// Toggle color when the control is disabled
         /// </summary>
+        [Category("Appearance")]
+        [Description("Toggle color when the control is disabled")]
+        [DefaultValue(typeof(Color), "LightGray")]
         public Color DisabledToggle
         {
             get => m_DisabledToggle;
@@ -255,6 +291,8 @@ namespace CommonControls
         /// <summary>
         /// Drawing style for the control
         /// </summary>
+        [Category("Appearance")]
+        [Description("Drawing style for the control")]
         [DefaultValue(DrawingStyles.Solid)]
         public DrawingStyles Style
         {
@@ -269,6 +307,8 @@ namespace CommonControls
         /// <summary>
         /// Override for the Text property to remove set
         /// </summary>
+        [Browsable(false)]
+        [EditorBrowsable(EditorBrowsableState.Never)]
         public override string Text { get => base.Text; }
 
         #endregion

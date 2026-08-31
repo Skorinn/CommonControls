@@ -63,12 +63,12 @@ dotnet build CommonControls.sln -p:Configuration=Release
 
 Or open `CommonControls.sln` in Visual Studio and build.
 
-The resulting `CommonControls.dll` is written to `bin\Release\`, and a post-build step also copies it to `bin\` so consumers can reference a single path regardless of configuration.
+The resulting `CommonControls.dll` is written to `bin\Release\`, alongside a `CommonControls.xml` documentation file, and a post-build step also copies the DLL to `bin\` so consumers can reference a single path regardless of configuration.
 
 ## Using the library
 
 1. Build the solution, or grab `CommonControls.dll` from a release.
-2. In your WinForms project, add a reference to `CommonControls.dll`.
+2. In your WinForms project, add a reference to `CommonControls.dll`. Keep `CommonControls.xml` beside it to get IntelliSense for the control's properties.
 3. Build your project once — the controls then appear in the Visual Studio toolbox and can be dragged onto a form and configured from the Properties window. Or create them in code, as shown above.
 
 ## License
