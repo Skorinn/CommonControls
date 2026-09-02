@@ -67,9 +67,23 @@ The resulting `CommonControls.dll` is written to `bin\Release\`, alongside a `Co
 
 ## Using the library
 
-1. Build the solution, or grab `CommonControls.dll` from a release.
+1. Download `CommonControls-<version>.zip` from the [latest release](https://github.com/Skorinn/CommonControls/releases/latest) and unpack it, or build the solution yourself.
 2. In your WinForms project, add a reference to `CommonControls.dll`. Keep `CommonControls.xml` beside it to get IntelliSense for the control's properties.
 3. Build your project once — the controls then appear in the Visual Studio toolbox and can be dragged onto a form and configured from the Properties window. Or create them in code, as shown above.
+
+## Releasing
+
+Releases are built and published by the [Release workflow](.github/workflows/release.yml) whenever a version tag is pushed:
+
+1. Update `AssemblyVersion`, `AssemblyFileVersion`, and `AssemblyInformationalVersion` in `Properties\AssemblyInfo.cs`, then commit.
+2. Tag the commit and push the tag:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow refuses to publish if the tag does not match the assembly version. It builds the Release configuration, packages the DLL, the documentation file, `LICENSE`, and `README.md` into a zip, and attaches it to a new GitHub release. Running the workflow manually from the Actions tab builds and packages without publishing.
 
 ## License
 

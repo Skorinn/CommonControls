@@ -9,6 +9,7 @@
 //====================================================================================================================
 // 2023/12/02 - Mike Pullen - Original implementation.
 // 2026/08/31 - Mike Pullen - Released under the MIT License.
+// 2026/09/02 - Mike Pullen - Set the version to 1.0.0 for the initial public release.
 //*********************************************************************************************************************
 using System;
 using System.Reflection;
@@ -44,5 +45,8 @@ using System.Runtime.InteropServices;
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("1.0.1.0")]
-[assembly: AssemblyFileVersion("1.0.1.0")]
+[assembly: AssemblyVersion("1.0.0.0")]
+[assembly: AssemblyFileVersion("1.0.0.0")]
+
+// The version reported to users, and the version the release tag must match
+[assembly: AssemblyInformationalVersion("1.0.0")]

@@ -1,0 +1,119 @@
+#**********************************************************************************************************************
+# File Name:      release.yml
+# Description:    Builds the library and publishes a GitHub release when a version tag is pushed
+#
+# Copyright (C) 2023 Mike Pullen.
+# Licensed under the MIT License. See the LICENSE file in the repository root.
+#
+# Revision History:
+#=====================================================================================================================
+# 2026/09/02 - Mike Pullen - Original implementation.
+#**********************************************************************************************************************
+name: Release
+
+on:
+  # Publish a release whenever a version tag is pushed
+  push:
+    tags:
+      - 'v*'
+
+  # Allow a dry run from the Actions tab, which builds and packages but does not publish
+  workflow_dispatch:
+
+# The release step needs to be able to write to the repository
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish
+    runs-on: windows-latest
+
+    steps:
+      # Get the source
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      # The project is a legacy csproj targeting .NET Framework 4.8, so it needs MSBuild rather than the dotnet CLI
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # The assembly is the single source of truth for the version number
+      - name: Read the version from AssemblyInfo.cs
+        id: version
+        shell: pwsh
+        run: |
+          $assemblyInfo = Get-Content 'Properties\AssemblyInfo.cs' -Raw
+
+          # Fail early if the informational version is missing or malformed
+          if ($assemblyInfo -notmatch 'AssemblyInformationalVersion\("([^"]+)"\)')
+          {
+              throw 'Could not find AssemblyInformationalVersion in Properties\AssemblyInfo.cs.'
+          }
+
+          $version = $Matches[1]
+          Write-Host "Assembly version: $version"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      # A tag that disagrees with the assembly would ship a mislabelled binary, so refuse to build one
+      - name: Verify the tag matches the assembly version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $expected = 'v${{ steps.version.outputs.version }}'
+
+          # Stop the release rather than publish a binary whose version does not match its tag
+          if ($tag -ne $expected)
+          {
+              throw "Tag '$tag' does not match the assembly version. Expected '$expected'."
+          }
+
+          Write-Host "Tag '$tag' matches the assembly version."
+
+      # Build the release configuration, treating warnings as errors so nothing undocumented ships
+      - name: Build
+        run: msbuild CommonControls.sln -p:Configuration=Release -p:TreatWarningsAsErrors=true -m
+
+      # Collect the binary, the IntelliSense documentation, and the legal and usage files
+      - name: Package the build output
+        id: package
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $stagingDirectory = "package\CommonControls-$version"
+
+          # Stage the files that make up the download
+          New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
+          Copy-Item 'bin\Release\CommonControls.dll' $stagingDirectory
+          Copy-Item 'bin\Release\CommonControls.xml' $stagingDirectory
+          Copy-Item 'LICENSE' $stagingDirectory
+          Copy-Item 'README.md' $stagingDirectory
+
+          # Compress the staged files into the release asset
+          $archive = "package\CommonControls-$version.zip"
+          Compress-Archive -Path "$stagingDirectory\*" -DestinationPath $archive -Force
+
+          Write-Host "Packaged $archive"
+          "archive=$archive" >> $env:GITHUB_OUTPUT
+
+      # Keep the package on the run itself, so a dry run is still inspectable
+      - name: Upload the package as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CommonControls-${{ steps.version.outputs.version }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error
+
+      # Publish the release, which only happens for a tagged build
+      - name: Publish the GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $summary = "CommonControls $version for .NET Framework 4.8. Download the zip below, reference CommonControls.dll from your Windows Forms project, and keep CommonControls.xml beside it for IntelliSense documentation."
+
+          # Create the release from the tag, attaching the package and appending the generated change log
+          gh release create '${{ github.ref_name }}' '${{ steps.package.outputs.archive }}' --title "CommonControls $version" --notes $summary --generate-notes --verify-tag
