@@ -8,6 +8,8 @@
 # Revision History:
 #=====================================================================================================================
 # 2026/09/02 - Mike Pullen - Original implementation.
+# 2026/09/03 - Mike Pullen - Required the tag to be reachable from master, and moved publishing into a separate job
+#                            gated by the release environment.
 #**********************************************************************************************************************
 name: Release
 
@@ -20,19 +22,25 @@ on:
   # Allow a dry run from the Actions tab, which builds and packages but does not publish
   workflow_dispatch:
 
-# The release step needs to be able to write to the repository
+# Building needs no more than read access, so the publish job asks for write on its own
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
-    name: Build and publish
+  build:
+    name: Build and package
     runs-on: windows-latest
 
+    # Hand the version to the publish job, which never checks out the source
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
     steps:
-      # Get the source
+      # Get the source, with the full history the ancestry check needs
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # The project is a legacy csproj targeting .NET Framework 4.8, so it needs MSBuild rather than the dotnet CLI
       - name: Set up MSBuild
@@ -71,13 +79,35 @@ jobs:
 
           Write-Host "Tag '$tag' matches the assembly version."
 
+      # Releases are cut from master, so a tag on unmerged work must not reach the publish job
+      - name: Verify the tag is reachable from master
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          # The checkout only fetched the tag, so fetch the release branch to compare against
+          git fetch origin +refs/heads/master:refs/remotes/origin/master --quiet
+
+          if ($LASTEXITCODE -ne 0)
+          {
+              throw 'Could not fetch master to check the tag against.'
+          }
+
+          # An unmerged commit would publish code that is not on the release branch
+          git merge-base --is-ancestor HEAD origin/master
+
+          if ($LASTEXITCODE -ne 0)
+          {
+              throw "Tag '${{ github.ref_name }}' is not reachable from master. Merge to master before tagging."
+          }
+
+          Write-Host "Tag '${{ github.ref_name }}' is reachable from master."
+
       # Build the release configuration, treating warnings as errors so nothing undocumented ships
       - name: Build
         run: msbuild CommonControls.sln -p:Configuration=Release -p:TreatWarningsAsErrors=true -m
 
       # Collect the binary, the IntelliSense documentation, and the legal and usage files
       - name: Package the build output
-        id: package
         shell: pwsh
         run: |
           $version = '${{ steps.version.outputs.version }}'
@@ -91,29 +121,50 @@ jobs:
           Copy-Item 'README.md' $stagingDirectory
 
           # Compress the staged files into the release asset
-          $archive = "package\CommonControls-$version.zip"
-          Compress-Archive -Path "$stagingDirectory\*" -DestinationPath $archive -Force
+          Compress-Archive -Path "$stagingDirectory\*" -DestinationPath "package\CommonControls-$version.zip" -Force
+          Write-Host "Packaged package\CommonControls-$version.zip"
 
-          Write-Host "Packaged $archive"
-          "archive=$archive" >> $env:GITHUB_OUTPUT
-
-      # Keep the package on the run itself, so a dry run is still inspectable
+      # Hand the package to the publish job, and keep it on a dry run so it stays inspectable
       - name: Upload the package as a build artifact
         uses: actions/upload-artifact@v4
         with:
           name: CommonControls-${{ steps.version.outputs.version }}
-          path: ${{ steps.package.outputs.archive }}
+          path: package\CommonControls-${{ steps.version.outputs.version }}.zip
           if-no-files-found: error
 
-      # Publish the release, which only happens for a tagged build
+  publish:
+    name: Publish the release
+    needs: build
+    runs-on: windows-latest
+
+    # Only a tagged build publishes, so a manual run stops after packaging
+    if: startsWith(github.ref, 'refs/tags/')
+
+    # The environment holds the manual approval and restricts which refs may publish
+    environment: release
+
+    # Creating a release is the only step that writes to the repository
+    permissions:
+      contents: write
+
+    steps:
+      # Take the package built and checked by the previous job rather than rebuilding it
+      - name: Download the package
+        uses: actions/download-artifact@v4
+        with:
+          name: CommonControls-${{ needs.build.outputs.version }}
+          path: package
+
+      # Publish the release from the tag that triggered the run
       - name: Publish the GitHub release
-        if: startsWith(github.ref, 'refs/tags/')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          $version = '${{ steps.version.outputs.version }}'
+          $version = '${{ needs.build.outputs.version }}'
+          $archive = "package\CommonControls-$version.zip"
           $summary = "CommonControls $version for .NET Framework 4.8. Download the zip below, reference CommonControls.dll from your Windows Forms project, and keep CommonControls.xml beside it for IntelliSense documentation."
 
           # Create the release from the tag, attaching the package and appending the generated change log
-          gh release create '${{ github.ref_name }}' '${{ steps.package.outputs.archive }}' --title "CommonControls $version" --notes $summary --generate-notes --verify-tag
+          gh release create '${{ github.ref_name }}' $archive --title "CommonControls $version" --notes $summary --generate-notes --verify-tag

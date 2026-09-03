@@ -75,15 +75,21 @@ The resulting `CommonControls.dll` is written to `bin\Release\`, alongside a `Co
 
 Releases are built and published by the [Release workflow](.github/workflows/release.yml) whenever a version tag is pushed:
 
-1. Update `AssemblyVersion`, `AssemblyFileVersion`, and `AssemblyInformationalVersion` in `Properties\AssemblyInfo.cs`, then commit.
-2. Tag the commit and push the tag:
+1. On `develop`, update `AssemblyVersion`, `AssemblyFileVersion`, and `AssemblyInformationalVersion` in `Properties\AssemblyInfo.cs`, then commit.
+2. Merge `develop` into `master`, which is the branch releases are cut from.
+3. Tag the merged commit on `master` and push the tag:
 
 ```powershell
-git tag v1.0.0
-git push origin v1.0.0
+git switch master
+git merge develop
+git push origin master
+git tag -a v1.0.1 -m "CommonControls 1.0.1"
+git push origin v1.0.1
 ```
 
-The workflow refuses to publish if the tag does not match the assembly version. It builds the Release configuration, packages the DLL, the documentation file, `LICENSE`, and `README.md` into a zip, and attaches it to a new GitHub release. Running the workflow manually from the Actions tab builds and packages without publishing.
+Before it builds anything, the workflow refuses to go on unless the tag matches the assembly version and the tagged commit is reachable from `master`, so a tag on unmerged `develop` work cannot become a release. It then builds the Release configuration and packages the DLL, the documentation file, `LICENSE`, and `README.md` into a zip.
+
+Publishing happens in a separate job gated by the `release` environment, which requires a manual approval and only accepts `v*` tags. Running the workflow manually from the Actions tab builds and packages without publishing, and needs no approval.
 
 ## License
 
