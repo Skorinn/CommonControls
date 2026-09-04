@@ -1,0 +1,63 @@
+#**********************************************************************************************************************
+# File Name:      build.yml
+# Description:    Builds the library on every push and pull request, so integration work is verified before release
+#
+# Copyright (C) 2023 Mike Pullen.
+# Licensed under the MIT License. See the LICENSE file in the repository root.
+#
+# Revision History:
+#=====================================================================================================================
+# 2026/09/04 - Mike Pullen - Original implementation.
+#**********************************************************************************************************************
+name: Build
+
+on:
+  # Verify the integration branch and the release branch
+  push:
+    branches:
+      - develop
+      - master
+
+  # Verify anything proposed for them
+  pull_request:
+    branches:
+      - develop
+      - master
+
+# Nothing here writes to the repository
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    runs-on: windows-latest
+
+    steps:
+      # Get the source
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # The project is a legacy csproj targeting .NET Framework 4.8, so it needs MSBuild rather than the dotnet CLI
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v3
+
+      # A malformed version would not be caught until release time, so check it here instead
+      - name: Verify the version is readable
+        shell: pwsh
+        run: |
+          $assemblyInfo = Get-Content 'Properties\AssemblyInfo.cs' -Raw
+
+          if ($assemblyInfo -notmatch 'AssemblyInformationalVersion\("([^"]+)"\)')
+          {
+              throw 'Could not find AssemblyInformationalVersion in Properties\AssemblyInfo.cs.'
+          }
+
+          Write-Host "Assembly version: $($Matches[1])"
+
+      # Build both configurations, treating warnings as errors so an undocumented public member fails the build
+      - name: Build Debug
+        run: msbuild CommonControls.sln -p:Configuration=Debug -p:TreatWarningsAsErrors=true -m
+
+      - name: Build Release
+        run: msbuild CommonControls.sln -p:Configuration=Release -p:TreatWarningsAsErrors=true -m
