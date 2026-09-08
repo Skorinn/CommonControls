@@ -12,6 +12,9 @@
 // 2026/08/31 - Mike Pullen - Released under the MIT License.
 // 2026/08/31 - Mike Pullen - Disposed of the GDI+ drawing resources, opted in to resize repainting and
 //                            double buffering, and added designer metadata to the properties.
+// 2026/09/08 - Mike Pullen - Took the surface behind the switch from the control's own BackColor rather than
+//                            clearing with the parent's, which needed a parent and blacked out the corners
+//                            when the parent was transparent.
 //*********************************************************************************************************************
 using System.ComponentModel;
 using System.Drawing;
@@ -51,8 +54,11 @@ namespace CommonControls
         /// </summary>
         public ToggleButton()
         {
-            // Repaint the whole surface on resize, and draw off screen, so resizing leaves no artifacts and does not flicker
-            this.SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            // Repaint the whole surface on resize, and draw off screen, so resizing leaves no artifacts and does not flicker.
+            // SupportsTransparentBackColor allows a consumer to set BackColor to Color.Transparent and have whatever the
+            // control is sitting on show through the corners the rounded switch does not reach.
+            this.SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer |
+                          ControlStyles.AllPaintingInWmPaint | ControlStyles.SupportsTransparentBackColor, true);
 
             // Minimum size required to ensure it is drawn correctly
             this.MinimumSize = new Size(50, 25);
@@ -67,9 +73,12 @@ namespace CommonControls
         /// <param name="paintEvent">IN - The paint event arguments</param>
         protected override void OnPaint(PaintEventArgs paintEvent)
         {
-            // Set the smoothing mode and clear the control area
+            // Set the smoothing mode. The surface behind the switch is not cleared here: AllPaintingInWmPaint has the
+            // background painted from the control's own BackColor immediately before this runs, which is the property a
+            // consumer sets to say what the switch is sitting on. Clearing with the parent's colour instead ignored that,
+            // required a parent to exist at paint time, and turned the corners black whenever the parent was transparent,
+            // because clearing with a transparent colour writes it into the buffer rather than letting anything through.
             paintEvent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            paintEvent.Graphics.Clear(this.Parent.BackColor);
 
             // Set the colors based on the state of the toggle
             Color backgroundColor;
