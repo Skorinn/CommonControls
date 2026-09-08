@@ -76,11 +76,26 @@ namespace CommonControls
         /// <param name="paintEvent">IN - The paint event arguments</param>
         protected override void OnPaint(PaintEventArgs paintEvent)
         {
-            // Set the smoothing mode. The surface behind the switch is not cleared here: AllPaintingInWmPaint has the
-            // background painted from the control's own BackColor immediately before this runs, which is the property a
-            // consumer sets to say what the switch is sitting on. Clearing with the parent's colour instead ignored that,
-            // required a parent to exist at paint time, and turned the corners black whenever the parent was transparent,
-            // because clearing with a transparent colour writes it into the buffer rather than letting anything through.
+            // Paint the surface the switch sits on. ButtonBase paints its own background from OnPaint rather than from
+            // OnPaintBackground, and this override replaces that, so nothing else clears the surface: left alone, the
+            // previous frame stays underneath and every repaint blends the new switch's antialiased edge over the old
+            // one, which builds a fringe of the previous colour around the switch.
+            if (Color.Transparent == this.BackColor)
+            {
+                // Let the framework draw whatever is behind the control through it
+                base.OnPaintBackground(paintEvent);
+            }
+            // Otherwise the consumer has said what the switch is sitting on
+            else
+            {
+                // Fill with that colour. This is the control's own BackColor rather than its parent's: taking the
+                // parent's ignored what the consumer had asked for, required a parent to exist at paint time, and
+                // turned the corners black whenever the parent was transparent, because clearing with a transparent
+                // colour writes it into the buffer rather than letting anything through.
+                paintEvent.Graphics.Clear(this.BackColor);
+            }
+
+            // Set the smoothing mode
             paintEvent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
             // Set the colors based on the state of the toggle
