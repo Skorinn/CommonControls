@@ -49,4 +49,4 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyFileVersion("1.0.1.0")]
 
 // The version reported to users, and the version the release tag must match
-[assembly: AssemblyInformationalVersion("1.0.0")]
+[assembly: AssemblyInformationalVersion("1.0.1")]
