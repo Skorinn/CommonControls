@@ -12,6 +12,12 @@
 // 2026/08/31 - Mike Pullen - Released under the MIT License.
 // 2026/08/31 - Mike Pullen - Disposed of the GDI+ drawing resources, opted in to resize repainting and
 //                            double buffering, and added designer metadata to the properties.
+// 2026/09/08 - Mike Pullen - Took the surface behind the switch from the control's own BackColor rather than
+//                            clearing with the parent's, which needed a parent and blacked out the corners
+//                            when the parent was transparent.
+// 2026/09/08 - Mike Pullen - Drew the background out to the control's right edge and inset the toggle by the
+//                            same amount on every side, so no notch is left beside the rounded end and the
+//                            toggle no longer looks to be breaking out of the background.
 //*********************************************************************************************************************
 using System.ComponentModel;
 using System.Drawing;
@@ -51,8 +57,11 @@ namespace CommonControls
         /// </summary>
         public ToggleButton()
         {
-            // Repaint the whole surface on resize, and draw off screen, so resizing leaves no artifacts and does not flicker
-            this.SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
+            // Repaint the whole surface on resize, and draw off screen, so resizing leaves no artifacts and does not flicker.
+            // SupportsTransparentBackColor allows a consumer to set BackColor to Color.Transparent and have whatever the
+            // control is sitting on show through the corners the rounded switch does not reach.
+            this.SetStyle(ControlStyles.ResizeRedraw | ControlStyles.OptimizedDoubleBuffer |
+                          ControlStyles.AllPaintingInWmPaint | ControlStyles.SupportsTransparentBackColor, true);
 
             // Minimum size required to ensure it is drawn correctly
             this.MinimumSize = new Size(50, 25);
@@ -67,9 +76,27 @@ namespace CommonControls
         /// <param name="paintEvent">IN - The paint event arguments</param>
         protected override void OnPaint(PaintEventArgs paintEvent)
         {
-            // Set the smoothing mode and clear the control area
+            // Paint the surface the switch sits on. ButtonBase paints its own background from OnPaint rather than from
+            // OnPaintBackground, and this override replaces that, so nothing else clears the surface: left alone, the
+            // previous frame stays underneath and every repaint blends the new switch's antialiased edge over the old
+            // one, which builds a fringe of the previous colour around the switch.
+            if (Color.Transparent == this.BackColor)
+            {
+                // Let the framework draw whatever is behind the control through it
+                base.OnPaintBackground(paintEvent);
+            }
+            // Otherwise the consumer has said what the switch is sitting on
+            else
+            {
+                // Fill with that colour. This is the control's own BackColor rather than its parent's: taking the
+                // parent's ignored what the consumer had asked for, required a parent to exist at paint time, and
+                // turned the corners black whenever the parent was transparent, because clearing with a transparent
+                // colour writes it into the buffer rather than letting anything through.
+                paintEvent.Graphics.Clear(this.BackColor);
+            }
+
+            // Set the smoothing mode
             paintEvent.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            paintEvent.Graphics.Clear(this.Parent.BackColor);
 
             // Set the colors based on the state of the toggle
             Color backgroundColor;
@@ -134,18 +161,19 @@ namespace CommonControls
         /// <returns>The rounded path used to draw the background</returns>
         private GraphicsPath GetBackgroundPath()
         {
-            // Determine what will be the radius of the toggle
-            int iToggleRadius = this.Height - 1;
+            // The rounded ends are as wide as the control is tall, so the background fills the control and
+            // meets its right edge. Ending short of it leaves a sliver of the control uncovered, which shows
+            // as a notch beside the rounded end rather than as nothing at all.
+            int iEndDiameter = this.Height - 1;
 
             // Create the left arc
             Point LeftArcStart = new Point(0, 0);
-            Size LeftArcSize = new Size(iToggleRadius, iToggleRadius);
-            Rectangle LeftArc = new Rectangle(LeftArcStart, LeftArcSize);
+            Size ArcSize = new Size(iEndDiameter, iEndDiameter);
+            Rectangle LeftArc = new Rectangle(LeftArcStart, ArcSize);
 
-            // Create the right arc
-            Point RightArcStart = new Point(this.Width-iToggleRadius-2, 0); // -2 = 1 for each side
-            Size RightArcSize = LeftArcSize;
-            Rectangle RightArc = new Rectangle(RightArcStart, RightArcSize);
+            // Create the right arc, its far edge on the last pixel of the control
+            Point RightArcStart = new Point(this.Width - iEndDiameter - 1, 0);
+            Rectangle RightArc = new Rectangle(RightArcStart, ArcSize);
 
             // Create the path for the toggle
             GraphicsPath TogglePath = new GraphicsPath();
@@ -163,25 +191,24 @@ namespace CommonControls
         /// <returns>The bounding rectangle of the toggle for the current state</returns>
         private Rectangle GetToggleRectangle()
         {
+            // The toggle sits inside the background by the same amount on every side. Deriving both the size
+            // and the position from that one inset keeps the gap even all the way round; setting them
+            // separately left the gap at the end the toggle had travelled to narrower than the others, and
+            // an uneven gap of a pixel or two reads as the toggle breaking out of the background.
+            int iBackgroundHeight = this.Height - 1;
+            int iToggleDiameter = iBackgroundHeight - (2 * m_iTOGGLE_INSET);
+            Size toggleSize = new Size(iToggleDiameter, iToggleDiameter);
+
             // Set the position based on the toggle state
-            Point toggleStart = new Point(0, 2);
-            
-            // If the toggle is enabled
+            Point toggleStart = new Point(m_iTOGGLE_INSET, m_iTOGGLE_INSET);
+
+            // If the toggle is on
             if (this.Checked)
             {
-                // Set the position to the right
-                toggleStart.X = this.Width - this.Height + 1;
+                // Set the position to the right, the same inset in from the background's right edge
+                toggleStart.X = (this.Width - 1) - m_iTOGGLE_INSET - iToggleDiameter;
             }
-            // Otherwise, the toggle is disabled
-            else
-            {
-                // Set the position to the left
-                toggleStart.X = 2;
-            }
-
-            // Set the size of the toggle
-            int iToggleDiameter = this.Height - 5;
-            Size toggleSize = new Size(iToggleDiameter, iToggleDiameter);
+            // Otherwise, the toggle is off and stays where it was placed, on the left
 
             // Create and return the rectangle
             Rectangle toggleRectangle = new Rectangle(toggleStart, toggleSize);
@@ -324,6 +351,9 @@ namespace CommonControls
 
         // Drawing style
         private DrawingStyles m_Style = DrawingStyles.Solid;
+
+        // How far the toggle sits inside the background, on every side
+        private const int m_iTOGGLE_INSET = 3;
 
         #endregion
     }
